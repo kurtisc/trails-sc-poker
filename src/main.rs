@@ -79,6 +79,15 @@ impl Card {
 
 impl std::fmt::Debug for Card {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+
+        #[cfg(feature="emoji")]
+        let suit = match self.suit() {
+            Club => "♣️",
+            Diamond => "♦️",
+            Heart => "♥️",
+            Spade => "♠️",
+        };
+        #[cfg(not(feature="emoji"))]
         let suit = match self.suit() {
             Club => "♣",
             Diamond => "♦",

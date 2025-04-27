@@ -11,3 +11,8 @@ regex = "1.11.1"
 
 [features]
 big-tests = []
+emoji = []
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
