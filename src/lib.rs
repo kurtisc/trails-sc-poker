@@ -486,86 +486,54 @@ pub mod tree_check {
 
     pub fn check(hand: &[&Card], deck: &Deck) -> Vec<PartialScore> {
         let swaps = HAND_SIZE - hand.len();
-        assert!(swaps <= deck.size());
+        let n = deck.size();
+        assert!(swaps <= n);
 
-        macro_rules! check_n {
-            () => {
-                deck.cards
-                    .par_iter()
-                    .fold(|| DeckTree::new(), |acc, card| acc + check_n!(&card))
-                    .reduce(|| DeckTree::new(), |a, b| a + b)
-            };
-
-            ($card1: expr) => {
-                deck.cards
-                    .par_iter()
-                    .fold(
-                        || DeckTree::new(),
-                        |acc, card| acc + check_n!($card1, &card),
-                    )
-                    .reduce(|| DeckTree::new(), |a, b| a + b)
-            };
-
-            ($card1: expr, $card2: expr) => {
-                deck.cards
-                    .par_iter()
-                    .fold(
-                        || DeckTree::new(),
-                        |acc, card| acc + check_n!($card1, $card2, &card),
-                    )
-                    .reduce(|| DeckTree::new(), |a, b| a + b)
-            };
-
-            ($card1: expr, $card2: expr, $card3: expr) => {
-                deck.cards
-                    .par_iter()
-                    .fold(
-                        || DeckTree::new(),
-                        |acc, card| acc + check_n!($card1, $card2, $card3, &card),
-                    )
-                    .reduce(|| DeckTree::new(), |a, b| a + b)
-            };
-
-            ($card1: expr, $card2: expr, $card3: expr, $card4: expr) => {{
-                deck.cards
-                    .par_iter()
-                    .fold(
-                        || DeckTree::new(),
-                        |acc, card| acc + check_n!($card1, $card2, $card3, $card4, &card),
-                    )
-                    .reduce(|| DeckTree::new(), |a, b| a + b)
-            }};
-
-            ($card1: expr, $card2: expr, $card3: expr, $card4: expr, $card5: expr) => {{
-                if $card1 != $card2
-                    && $card1 != $card3
-                    && $card1 != $card4
-                    && $card1 != $card5
-                    && $card2 != $card3
-                    && $card2 != $card4
-                    && $card2 != $card5
-                    && $card3 != $card4
-                    && $card3 != $card5
-                    && $card4 != $card5
-                {
-                    check::check(&[$card1, $card2, $card3, $card4, $card5]).into()
-                } else {
-                    DeckTree::new()
-                }
-            }};
-        }
-
-        let deck_tree = match swaps {
-            0 => check_n!(&hand[0], &hand[1], &hand[2], &hand[3], &hand[4]),
-            1 => check_n!(&hand[0], &hand[1], &hand[2], &hand[3]),
-            2 => check_n!(&hand[0], &hand[1], &hand[2]),
-            3 => check_n!(&hand[0], &hand[1]),
-            4 => check_n!(&hand[0]),
-            5 => check_n!(),
-            _ => panic!(),
+        let deck_tree = if swaps == 0 {
+            check::check(&[hand[0], hand[1], hand[2], hand[3], hand[4]]).into()
+        } else {
+            // Enumerate C(n, swaps) combinations of deck cards (increasing
+            // index order), instead of the swaps! permutations of each --
+            // hand scoring doesn't depend on draw order, so this reaches the
+            // same enumeration/outcome ratios while doing up to 5! = 120x
+            // less work. Only the first pick is parallelised: each top-level
+            // task then does the remaining picks sequentially into a stack
+            // buffer, which keeps rayon's task count small relative to the
+            // work per task.
+            (0..=n - swaps)
+                .into_par_iter()
+                .fold(DeckTree::new, |mut acc, i| {
+                    let mut full = [&deck.cards[i]; HAND_SIZE];
+                    full[..hand.len()].copy_from_slice(hand);
+                    combine(&mut full, hand.len() + 1, &deck.cards, i + 1, swaps - 1, &mut acc);
+                    acc
+                })
+                .reduce(DeckTree::new, |a, b| a + b)
         };
 
         deck_tree.into()
+    }
+
+    // Fills `full[pos..]` with `remaining` more cards drawn (in increasing
+    // index order, i.e. as a combination) from `deck_cards[start..]`,
+    // scoring and accumulating each completed hand into `tree`.
+    fn combine<'a>(
+        full: &mut [&'a Card; HAND_SIZE],
+        pos: usize,
+        deck_cards: &'a [Card],
+        start: usize,
+        remaining: usize,
+        tree: &mut DeckTree,
+    ) {
+        if remaining == 0 {
+            *tree += check::check(full).into();
+            return;
+        }
+
+        for i in start..=deck_cards.len() - remaining {
+            full[pos] = &deck_cards[i];
+            combine(full, pos + 1, deck_cards, i + 1, remaining - 1, tree);
+        }
     }
 
     struct DeckTree {
