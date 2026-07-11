@@ -231,22 +231,12 @@ const NEW_DECK: [Card; 52] = [
 ];
 
 pub struct Deck {
-    clubs: usize,
-    diamonds: usize,
-    hearts: usize,
-    spades: usize,
-    ranks: [usize; 13],
     cards: Vec<Card>,
 }
 
 impl Deck {
     fn new() -> Self {
         Deck {
-            clubs: 13,
-            diamonds: 13,
-            hearts: 13,
-            spades: 13,
-            ranks: [4; 13],
             cards: NEW_DECK.to_vec(),
         }
     }
@@ -261,13 +251,6 @@ impl Deck {
     fn take_card(mut self, card: &Card) -> Self {
         for i in 0..self.cards.len() {
             if self.cards[i] == *card {
-                match card.suit() {
-                    Suit::Club => self.clubs -= 1,
-                    Suit::Diamond => self.diamonds -= 1,
-                    Suit::Heart => self.hearts -= 1,
-                    Suit::Spade => self.spades -= 1,
-                };
-                self.ranks[card.rank() - 1] -= 1;
                 self.cards.swap_remove(i);
                 break;
             }
@@ -278,30 +261,7 @@ impl Deck {
 
 impl From<Vec<Card>> for Deck {
     fn from(cards: Vec<Card>) -> Self {
-        let mut clubs = 0;
-        let mut diamonds = 0;
-        let mut hearts = 0;
-        let mut spades = 0;
-        let mut ranks = [0; 13];
-
-        for card in &cards {
-            match card.suit() {
-                Suit::Club => clubs += 1,
-                Suit::Diamond => diamonds += 1,
-                Suit::Heart => hearts += 1,
-                Suit::Spade => spades += 1,
-            };
-            ranks[card.rank() - 1] += 1;
-        }
-
-        Deck {
-            clubs,
-            diamonds,
-            hearts,
-            spades,
-            ranks,
-            cards,
-        }
+        Deck { cards }
     }
 }
 
@@ -891,10 +851,7 @@ pub mod tree_check {
     }
 
     pub fn best_score(full_hand: FullHand, deck: &Deck, multiplier: Option<i32>) -> Rational {
-        let multiplier = match multiplier {
-            Some(m) => m,
-            _ => 1,
-        };
+        let multiplier = multiplier.unwrap_or(1);
 
         let mut result = expected_swap_values(&full_hand, deck, multiplier);
         result.sort_by(|(_, a), (_, b)| a.cmp(b).reverse());
