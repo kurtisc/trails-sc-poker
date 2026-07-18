@@ -1,5 +1,7 @@
 use check::parse_input;
 use check::tree_check;
+use check::Card;
+use rational::Rational;
 
 fn main() {
     use std::io::stdin;
@@ -30,8 +32,25 @@ fn main() {
         let multiplier: i32 = multiplier_string.trim().parse().expect("Input not an integer");
 
         let deck = (&full_hand).into();
-        tree_check::best_score(full_hand, &deck, Some(multiplier));
+        let ranked = tree_check::ranked_swap_values(&full_hand, &deck, multiplier);
+        print_results(&ranked, multiplier);
     }
+}
+
+fn print_results(ranked: &[(Vec<&Card>, Rational)], multiplier: i32) {
+    let as_f32 = |score: &Rational| score.numerator() as f32 / score.denominator() as f32;
+
+    for (label, (keep, score)) in ["1st", "2nd", "3rd"].iter().zip(ranked) {
+        println!("{label}: {:?} : {:.2}", keep, as_f32(score) / multiplier as f32);
+    }
+
+    let (keep, score) = &ranked[0];
+    println!("\n\n    Best hand to keep: {:?}", keep);
+    println!(
+        "      it has an expected score of {:.2} ({:.1})",
+        as_f32(score) / multiplier as f32,
+        as_f32(score)
+    );
 }
 
 fn print_usage() {

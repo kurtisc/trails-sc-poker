@@ -818,35 +818,22 @@ pub mod tree_check {
         .collect()
     }
 
+    // Sorted best-first by expected score. Kept separate from `best_score`
+    // (and free of I/O) so callers -- CLI printing, benchmarks, tests -- can
+    // use the ranking without paying for or filtering out console output.
+    pub fn ranked_swap_values<'a>(
+        full_hand: &'a FullHand,
+        deck: &Deck,
+        multiplier: i32,
+    ) -> Vec<(Vec<&'a Card>, Rational)> {
+        let mut result = expected_swap_values(full_hand, deck, multiplier);
+        result.sort_by(|(_, a), (_, b)| a.cmp(b).reverse());
+        result
+    }
+
     pub fn best_score(full_hand: FullHand, deck: &Deck, multiplier: Option<i32>) -> Rational {
         let multiplier = multiplier.unwrap_or(1);
-
-        let mut result = expected_swap_values(&full_hand, deck, multiplier);
-        result.sort_by(|(_, a), (_, b)| a.cmp(b).reverse());
-
-        println!(
-            "1st: {:?} : {:.2}",
-            result[0].0,
-            (result[0].1.numerator() as f32 / result[0].1.denominator() as f32) / multiplier as f32
-        );
-        println!(
-            "2nd: {:?} : {:.2}",
-            result[1].0,
-            (result[1].1.numerator() as f32 / result[1].1.denominator() as f32) / multiplier as f32
-        );
-        println!(
-            "3rd: {:?} : {:.2}",
-            result[2].0,
-            (result[2].1.numerator() as f32 / result[2].1.denominator() as f32) / multiplier as f32
-        );
-        println!("\n\n    Best hand to keep: {:?}", result[0].0);
-        println!(
-            "      it has an expected score of {:.2} ({:.1})",
-            (result[0].1.numerator() as f32 / result[0].1.denominator() as f32) / multiplier as f32,
-            (result[0].1.numerator() as f32 / result[0].1.denominator() as f32)
-        );
-
-        result[0].1
+        ranked_swap_values(&full_hand, deck, multiplier)[0].1
     }
 
     #[test]

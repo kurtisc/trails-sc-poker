@@ -31,7 +31,7 @@ fn bench_check_by_swaps(c: &mut Criterion) {
     ];
 
     let mut group = c.benchmark_group("tree_check::check");
-    for swaps in 1..=3 {
+    for swaps in 1..=5 {
         let keep = &cards[..5 - swaps];
         group.bench_function(format!("{swaps}_swap(s)"), |b| {
             b.iter(|| tree_check::check(black_box(keep), black_box(&deck)))
@@ -40,5 +40,21 @@ fn bench_check_by_swaps(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, bench_parse, bench_check_by_swaps);
+// The realistic end-to-end workload: ranked_swap_values checks all 32
+// subsets of the hand (the powerset), so it pays for the worst (5-swap)
+// case eight times over. This is what a single interactive query costs.
+fn bench_ranked_swap_values(c: &mut Criterion) {
+    let full_hand = sample_hand();
+    let deck = (&full_hand).into();
+
+    c.bench_function("tree_check::ranked_swap_values", |b| {
+        b.iter(|| tree_check::ranked_swap_values(black_box(&full_hand), black_box(&deck), 1))
+    });
+}
+
+criterion_group! {
+    name = benches;
+    config = Criterion::default().sample_size(20);
+    targets = bench_parse, bench_check_by_swaps, bench_ranked_swap_values
+}
 criterion_main!(benches);
