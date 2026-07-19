@@ -1057,7 +1057,7 @@ pub mod parse_input {
     use crate::Rank::*;
     use crate::Suit::*;
 
-    const REGEX: &str = r"((\d*|a|A|j|J|q|Q|k|K])([cCdDhHsS]))(?: |,|\.?)";
+    const REGEX: &str = r"((\d*|a|A|j|J|q|Q|k|K)([cCdDhHsS]))(?: |,|\.?)";
 
     impl TryFrom<(&str, &str)> for Card {
         type Error = ();
