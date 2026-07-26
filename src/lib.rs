@@ -473,17 +473,28 @@ pub mod tree_check {
         let n = deck.size();
         assert!(swaps <= n);
 
+        // Enumerate C(n, swaps) combinations of deck cards (increasing index
+        // order), instead of the swaps! permutations of each -- hand
+        // scoring doesn't depend on draw order, so this reaches the same
+        // enumeration/outcome ratios while doing up to 5! = 120x less work.
+        //
+        // Below PARALLEL_SWAPS_THRESHOLD, rayon's per-task scheduling
+        // overhead dwarfs the handful of leaf combinations each top-level
+        // task would do, so it's run as a plain fold instead: measured on
+        // this machine, sequential is ~35x faster at 1 swap (781ns vs
+        // 27us) and ~2x faster at 2 swaps (16.2us vs 30.8us), while
+        // parallel pulls ahead from 3 swaps on (74.8us vs 254.4us) as
+        // there's enough work per top-level task to amortize the overhead.
         let deck_tree = if swaps == 0 {
             check::check(&[hand[0], hand[1], hand[2], hand[3], hand[4]]).into()
+        } else if swaps < PARALLEL_SWAPS_THRESHOLD {
+            (0..=n - swaps).fold(DeckTree::new(), |mut acc, i| {
+                let mut full = [&deck.cards[i]; HAND_SIZE];
+                full[..hand.len()].copy_from_slice(hand);
+                combine(&mut full, hand.len() + 1, &deck.cards, i + 1, swaps - 1, &mut acc);
+                acc
+            })
         } else {
-            // Enumerate C(n, swaps) combinations of deck cards (increasing
-            // index order), instead of the swaps! permutations of each --
-            // hand scoring doesn't depend on draw order, so this reaches the
-            // same enumeration/outcome ratios while doing up to 5! = 120x
-            // less work. Only the first pick is parallelised: each top-level
-            // task then does the remaining picks sequentially into a stack
-            // buffer, which keeps rayon's task count small relative to the
-            // work per task.
             (0..=n - swaps)
                 .into_par_iter()
                 .fold(DeckTree::new, |mut acc, i| {
@@ -497,6 +508,8 @@ pub mod tree_check {
 
         deck_tree.into()
     }
+
+    const PARALLEL_SWAPS_THRESHOLD: usize = 3;
 
     // Fills `full[pos..]` with `remaining` more cards drawn (in increasing
     // index order, i.e. as a combination) from `deck_cards[start..]`,
