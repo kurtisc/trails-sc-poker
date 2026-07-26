@@ -58,22 +58,11 @@ impl Card {
         &self.1
     }
 
+    // Rank's discriminants are already 1..=13 in order, so this is a plain
+    // load instead of a 13-arm match -- rank() is on the hottest path in
+    // the crate (called for every card of every candidate hand).
     pub fn rank(&self) -> usize {
-        match self.0 {
-            Ace => 1,
-            Two => 2,
-            Three => 3,
-            Four => 4,
-            Five => 5,
-            Six => 6,
-            Seven => 7,
-            Eight => 8,
-            Nine => 9,
-            Ten => 10,
-            Jack => 11,
-            Queen => 12,
-            King => 13,
-        }
+        self.0 as usize
     }
 }
 
@@ -324,22 +313,22 @@ mod check {
     use crate::Score;
 
     pub(crate) fn check(hand: &[&Card; 5]) -> Option<Score> {
+        let mut count = [0u8; 13];
+        for card in hand {
+            count[card.rank() - 1] += 1;
+        }
+
         // If pair+, can only be pair+
-        match pair_plus(hand) {
+        match pair_plus(&count) {
             p @ Some(_) => p,
-            None => match straight(flush(hand), hand) {
+            None => match straight(flush(hand), &count) {
                 f @ Some(_) => f,
                 None => None,
             },
         }
     }
 
-    fn straight(score: Option<Score>, hand: &[&Card; 5]) -> Option<Score> {
-        let mut count = [0; 13];
-        for card in hand {
-            count[card.rank() - 1] += 1;
-        }
-
+    fn straight(score: Option<Score>, count: &[u8; 13]) -> Option<Score> {
         if let (1, 1, 1, 1) = (count[12], count[11], count[10], count[9]) {
             if count[0] == 1 {
                 if score == Some(Score::Flush) {
@@ -384,17 +373,12 @@ mod check {
         score
     }
 
-    fn pair_plus(hand: &[&Card]) -> Option<Score> {
-        let mut count = [0; 13];
-        for card in hand {
-            count[card.rank() - 1] += 1;
-        }
-
+    fn pair_plus(count: &[u8; 13]) -> Option<Score> {
         let mut total = 0;
         let mut max1 = 1;
         let mut max2 = 1;
 
-        for i in count {
+        for &i in count {
             total += i;
             if i >= max1 {
                 max2 = max1;
@@ -402,7 +386,7 @@ mod check {
             } else if i > max2 && i < max1 {
                 max2 = i;
             }
-            if total == hand.len() {
+            if total == 5 {
                 break;
             }
         }
