@@ -314,63 +314,50 @@ mod check {
 
     pub(crate) fn check(hand: &[&Card; 5]) -> Option<Score> {
         let mut count = [0u8; 13];
+        let mut rank_mask = 0u16;
         for card in hand {
-            count[card.rank() - 1] += 1;
+            let rank = card.rank() - 1;
+            count[rank] += 1;
+            rank_mask |= 1 << rank;
         }
 
         // If pair+, can only be pair+
         match pair_plus(&count) {
             p @ Some(_) => p,
-            None => match straight(flush(hand), &count) {
+            None => match straight(flush(hand), rank_mask) {
                 f @ Some(_) => f,
                 None => None,
             },
         }
     }
 
-    fn straight(score: Option<Score>, count: &[u8; 13]) -> Option<Score> {
-        if let (1, 1, 1, 1) = (count[12], count[11], count[10], count[9]) {
-            if count[0] == 1 {
-                if score == Some(Score::Flush) {
-                    return Some(Score::RoyalFlush);
-                } else {
-                    return Some(Score::Straight);
-                }
+    // Ace is bit 0, King is bit 12. pair_plus already ruled out duplicate
+    // ranks, so rank_mask always has exactly 5 bits set here, which lets
+    // the general case below skip straight-out and detect any 5-consecutive
+    // run with a handful of shift/AND ops instead of a scanning loop.
+    fn straight(score: Option<Score>, rank_mask: u16) -> Option<Score> {
+        const ROYAL: u16 = (1 << 12) | (1 << 11) | (1 << 10) | (1 << 9) | 1; // K Q J 10 A
+        const WHEEL: u16 = (1 << 4) | (1 << 3) | (1 << 2) | (1 << 1) | 1; // 5 4 3 2 A
+
+        let is_straight = match rank_mask {
+            ROYAL | WHEEL => true,
+            _ => {
+                // Ranks Two..King as bits 1..12 (bit 0/Ace excluded: any
+                // straight using it is already covered by ROYAL/WHEEL
+                // above, so leaving it out here can't produce a false hit).
+                let m = rank_mask & 0b1_1111_1111_1110;
+                m & (m >> 1) & (m >> 2) & (m >> 3) & (m >> 4) != 0
             }
-            if count[8] == 1 {
-                if score == Some(Score::Flush) {
-                    return Some(Score::StraightFlush);
-                } else {
-                    return Some(Score::Straight);
-                }
-            }
+        };
+
+        if !is_straight {
             return score;
         }
-
-        for rank in (4..=12).rev() {
-            if count[rank] > 1 {
-                return score;
-            }
-
-            if count[rank] == 1 {
-                return match (
-                    count[rank - 1],
-                    count[rank - 2],
-                    count[rank - 3],
-                    count[rank - 4],
-                ) {
-                    (1, 1, 1, 1) => {
-                        if score == Some(Score::Flush) {
-                            return Some(Score::StraightFlush);
-                        } else {
-                            return Some(Score::Straight);
-                        }
-                    }
-                    _ => score,
-                };
-            }
+        match (score, rank_mask) {
+            (Some(Score::Flush), ROYAL) => Some(Score::RoyalFlush),
+            (Some(Score::Flush), _) => Some(Score::StraightFlush),
+            _ => Some(Score::Straight),
         }
-        score
     }
 
     fn pair_plus(count: &[u8; 13]) -> Option<Score> {
