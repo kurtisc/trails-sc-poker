@@ -322,7 +322,7 @@ mod check {
         }
 
         // If pair+, can only be pair+
-        match pair_plus(&count) {
+        match pair_plus(&count, rank_mask) {
             p @ Some(_) => p,
             None => match straight(flush(hand), rank_mask) {
                 f @ Some(_) => f,
@@ -360,35 +360,20 @@ mod check {
         }
     }
 
-    fn pair_plus(count: &[u8; 13]) -> Option<Score> {
-        let mut total = 0;
-        let mut max1 = 1;
-        let mut max2 = 1;
-
-        for &i in count {
-            total += i;
-            if i >= max1 {
-                max2 = max1;
-                max1 = i;
-            } else if i > max2 && i < max1 {
-                max2 = i;
-            }
-            if total == 5 {
-                break;
-            }
-        }
-
-        match max1 {
-            1 => None,
-            2 => match max2 {
-                2 => Some(Score::TwoPair),
-                _ => Some(Score::Pair),
-            },
-            3 => match max2 {
-                2 => Some(Score::FullHouse),
-                _ => Some(Score::ThreeOfAKind),
-            },
-            _ => Some(Score::FourOfAKind),
+    // A 5-card hand from a standard deck has 2..=5 distinct ranks, and that
+    // count alone decides the outcome for 5 (no pair) and 4 (one pair) --
+    // ~93% of all hands -- with no need to look at `count` at all. Only 3
+    // distinct (two pair vs. three of a kind) and 2 distinct (full house
+    // vs. four of a kind) are ambiguous and need a look at the actual
+    // multiplicities, and even then just to find the one triple/quad.
+    fn pair_plus(count: &[u8; 13], rank_mask: u16) -> Option<Score> {
+        match rank_mask.count_ones() {
+            5 => None,
+            4 => Some(Score::Pair),
+            3 if count.contains(&3) => Some(Score::ThreeOfAKind),
+            3 => Some(Score::TwoPair),
+            _ if count.contains(&4) => Some(Score::FourOfAKind),
+            _ => Some(Score::FullHouse),
         }
     }
 
