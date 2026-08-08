@@ -495,7 +495,7 @@ pub mod tree_check {
         tree: &mut DeckTree,
     ) {
         if remaining == 0 {
-            *tree += check::check(full).into();
+            tree.record(check::check(full));
             return;
         }
 
@@ -531,6 +531,25 @@ pub mod tree_check {
                 four_of_a_kinds: 0,
                 straight_flushes: 0,
                 royal_flushes: 0,
+            }
+        }
+
+        // Increments the one counter `score` maps to (plus enumerations)
+        // directly, instead of building a 9-zero-field DeckTree just to
+        // AddAssign it in -- this runs on every leaf hand.
+        fn record(&mut self, score: Option<Score>) {
+            self.enumerations += 1;
+            match score {
+                Some(Score::Pair) => self.pairs += 1,
+                Some(Score::TwoPair) => self.two_pairs += 1,
+                Some(Score::ThreeOfAKind) => self.three_of_a_kinds += 1,
+                Some(Score::Straight) => self.straights += 1,
+                Some(Score::Flush) => self.flushes += 1,
+                Some(Score::FullHouse) => self.full_houses += 1,
+                Some(Score::FourOfAKind) => self.four_of_a_kinds += 1,
+                Some(Score::StraightFlush) => self.straight_flushes += 1,
+                Some(Score::RoyalFlush) => self.royal_flushes += 1,
+                None => {}
             }
         }
     }
