@@ -405,7 +405,7 @@ pub mod tree_check {
     use crate::TWO_PAIR_SCORE;
     use crate::check;
 
-    use std::ops::{Add, AddAssign};
+    use std::ops::Add;
 
     use itertools::Itertools;
     use rational::Rational;
@@ -740,21 +740,6 @@ pub mod tree_check {
                     royal_flushes: 0,
                 },
             }
-        }
-    }
-
-    impl AddAssign for DeckTree {
-        fn add_assign(&mut self, other: Self) {
-            self.enumerations += other.enumerations;
-            self.pairs += other.pairs;
-            self.two_pairs += other.two_pairs;
-            self.three_of_a_kinds += other.three_of_a_kinds;
-            self.straights += other.straights;
-            self.flushes += other.flushes;
-            self.full_houses += other.full_houses;
-            self.four_of_a_kinds += other.four_of_a_kinds;
-            self.straight_flushes += other.straight_flushes;
-            self.royal_flushes += other.royal_flushes;
         }
     }
 
