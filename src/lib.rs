@@ -313,16 +313,13 @@ mod check {
     use crate::Score;
 
     pub(crate) fn check(hand: &[&Card; 5]) -> Option<Score> {
-        let mut count = [0u8; 13];
         let mut rank_mask = 0u16;
         for card in hand {
-            let rank = card.rank() - 1;
-            count[rank] += 1;
-            rank_mask |= 1 << rank;
+            rank_mask |= 1 << (card.rank() - 1);
         }
 
         // If pair+, can only be pair+
-        match pair_plus(&count, rank_mask) {
+        match pair_plus(hand, rank_mask) {
             p @ Some(_) => p,
             None => match straight(flush(hand), rank_mask) {
                 f @ Some(_) => f,
@@ -362,14 +359,25 @@ mod check {
 
     // A 5-card hand from a standard deck has 2..=5 distinct ranks, and that
     // count alone decides the outcome for 5 (no pair) and 4 (one pair) --
-    // ~93% of all hands -- with no need to look at `count` at all. Only 3
+    // ~93% of all hands -- with no need for a rank histogram at all. Only 3
     // distinct (two pair vs. three of a kind) and 2 distinct (full house
-    // vs. four of a kind) are ambiguous and need a look at the actual
-    // multiplicities, and even then just to find the one triple/quad.
-    fn pair_plus(count: &[u8; 13], rank_mask: u16) -> Option<Score> {
-        match rank_mask.count_ones() {
-            5 => None,
-            4 => Some(Score::Pair),
+    // vs. four of a kind) are ambiguous, so the histogram is only built for
+    // that rare ~7% tail, and just to find the one triple/quad.
+    fn pair_plus(hand: &[&Card; 5], rank_mask: u16) -> Option<Score> {
+        let distinct = rank_mask.count_ones();
+        if distinct == 5 {
+            return None;
+        }
+        if distinct == 4 {
+            return Some(Score::Pair);
+        }
+
+        let mut count = [0u8; 13];
+        for card in hand {
+            count[card.rank() - 1] += 1;
+        }
+
+        match distinct {
             3 if count.contains(&3) => Some(Score::ThreeOfAKind),
             3 => Some(Score::TwoPair),
             _ if count.contains(&4) => Some(Score::FourOfAKind),
